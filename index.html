@@ -147,7 +147,7 @@
             </section>
 
             <!-- ETAPA 4: Resumo e Exportação -->
-            <section id="step4" class="bg-slate-900 text-white p-5 rounded-xl shadow-sm border border-slate-700 mb-20">
+            <section id="step4" class="bg-slate-900 text-white p-5 rounded-xl shadow-sm border border-slate-700 mb-6">
                 <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
                     <h2 class="text-lg font-semibold">Etapa 4: Resumo e Envio</h2>
                     <span id="totalItems" class="bg-slate-700 text-white text-xs font-bold px-2 py-1 rounded-full">0 itens na memória</span>
@@ -173,6 +173,11 @@
                     </div>
                 </div>
             </section>
+            
+            <!-- Botão de Segurança -->
+            <div class="text-center pb-10">
+                <button onclick="recoverBackup()" class="text-xs text-slate-500 underline hover:text-slate-700">⚠ Restaurar último backup local (Anti-falha)</button>
+            </div>
 
         </div>
     </main>
@@ -186,11 +191,10 @@
     </div>
 
     <script>
-        // CONFIGURAÇÃO DO GOOGLE SHEETS
+        // CONFIGURAÇÃO DO GOOGLE SHEETS - MANTIVE O SEU LINK
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwvEvKleaB_4ecJ86K8FO-9_zLtuVrdL6qkau8nuYKnNGz5Nu3W7VFczUrfenv4EMX2FA/exec";
 
         // --- Estado da Aplicação e Armazenamento Local ---
-        // O banco de dados sobrevive ao recarregar a página graças ao localStorage
         let assetsDatabase = JSON.parse(localStorage.getItem('audit_db')) || [];
         let currentLoc = "";
         let html5QrcodeScanner = null;
@@ -210,7 +214,7 @@
                 toast.classList.replace('bg-red-600', 'bg-slate-900');
             }
 
-            setTimeout(() => toast.style.opacity = '0', 3000);
+            setTimeout(() => toast.style.opacity = '0', 3500);
         }
 
         function updateOnlineStatus() {
@@ -219,11 +223,11 @@
             if (navigator.onLine) {
                 status.innerText = "Conectado (WiFi/Dados)";
                 status.className = "text-[10px] text-center mt-1 uppercase font-bold text-emerald-400";
-                syncBtn.disabled = false;
+                if(syncBtn) syncBtn.disabled = false;
             } else {
                 status.innerText = "Offline (Sincronismo Pausado)";
                 status.className = "text-[10px] text-center mt-1 uppercase font-bold text-red-400";
-                syncBtn.disabled = true;
+                if(syncBtn) syncBtn.disabled = true;
             }
         }
         window.addEventListener('online', updateOnlineStatus);
@@ -378,7 +382,7 @@
             };
 
             assetsDatabase.push(asset);
-            localStorage.setItem('audit_db', JSON.stringify(assetsDatabase)); // Salva no celular
+            localStorage.setItem('audit_db', JSON.stringify(assetsDatabase)); 
             
             document.getElementById('plaqueInput').value = '';
             resetPhotoField('serialPhoto', 'photoStatus', 'downloadPhotoContainer', 2);
@@ -408,7 +412,7 @@
             };
 
             assetsDatabase.push(asset);
-            localStorage.setItem('audit_db', JSON.stringify(assetsDatabase)); // Salva no celular
+            localStorage.setItem('audit_db', JSON.stringify(assetsDatabase)); 
             
             document.getElementById('newCodeInput').value = '';
             document.getElementById('newNameInput').value = '';
@@ -462,8 +466,22 @@
             });
         }
 
-        // Inicia a lista ao carregar a página
         updateAssetList();
+
+        // --- TRAVA DE SEGURANÇA E BACKUP (Recuperação de dados) ---
+        function recoverBackup() {
+            const backup = localStorage.getItem('audit_backup');
+            if (backup && JSON.parse(backup).length > 0) {
+                if(confirm("Deseja restaurar os dados apagados na última tentativa de sincronização?")) {
+                    assetsDatabase = JSON.parse(backup);
+                    localStorage.setItem('audit_db', backup);
+                    updateAssetList();
+                    showToast("Dados recuperados do último backup!", "success");
+                }
+            } else {
+                showToast("Não há dados antigos salvos para recuperar.", "error");
+            }
+        }
 
         async function syncWithGoogle() {
             if(assetsDatabase.length === 0) return showToast("Não há itens na memória para sincronizar.", "error");
@@ -474,24 +492,31 @@
             btn.disabled = true;
 
             try {
-                // Envia para o Google Sheets
-                await fetch(SCRIPT_URL, {
+                // BACKUP PRÉVIO: Antes de tentar o envio, faz backup no aparelho
+                localStorage.setItem('audit_backup', JSON.stringify(assetsDatabase));
+
+                // Faz o POST para o Apps Script
+                const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
-                    cache: 'no-cache',
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
                     body: JSON.stringify(assetsDatabase)
                 });
 
+                if (!response.ok) {
+                    throw new Error("Erro na rede ou bloqueio de permissão no Google Script.");
+                }
+
                 showToast("Dados enviados para o Google Sheets com sucesso!");
                 
-                // Esvazia o banco de dados local após o sucesso
+                // Limpa o banco principal local já que deu certo
                 assetsDatabase = []; 
                 localStorage.setItem('audit_db', JSON.stringify(assetsDatabase));
                 updateAssetList();
                 
             } catch (error) {
                 console.error(error);
-                showToast("Erro ao sincronizar. Verifique a internet.", "error");
+                showToast("Erro de envio. Seus dados NÃO foram apagados.", "error");
+                alert("Falha de Comunicação!\n\nSeus dados estão preservados.\n\nPor favor, garanta que no Google Apps Script as permissões estejam como 'Acesso: Qualquer pessoa'.");
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;

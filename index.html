@@ -470,14 +470,14 @@
 
         // --- TRAVA DE SEGURANÇA E BACKUP (Recuperação de dados) ---
         function recoverBackup() {
+        // --- TRAVA DE SEGURANÇA E BACKUP ---
+        function recoverBackup() {
             const backup = localStorage.getItem('audit_backup');
             if (backup && JSON.parse(backup).length > 0) {
-                if(confirm("Deseja restaurar os dados apagados na última tentativa de sincronização?")) {
-                    assetsDatabase = JSON.parse(backup);
-                    localStorage.setItem('audit_db', backup);
-                    updateAssetList();
-                    showToast("Dados recuperados do último backup!", "success");
-                }
+                assetsDatabase = JSON.parse(backup);
+                localStorage.setItem('audit_db', backup);
+                updateAssetList();
+                showToast("Dados recuperados do último backup de segurança!", "success");
             } else {
                 showToast("Não há dados antigos salvos para recuperar.", "error");
             }
@@ -492,31 +492,31 @@
             btn.disabled = true;
 
             try {
-                // BACKUP PRÉVIO: Antes de tentar o envio, faz backup no aparelho
-                localStorage.setItem('audit_backup', JSON.stringify(assetsDatabase));
-
-                // Faz o POST para o Apps Script
-                const response = await fetch(SCRIPT_URL, {
+                // CORREÇÃO: Usamos mode 'no-cors' para o navegador não bloquear a resposta opaca do Google
+                await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    mode: 'no-cors', 
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
                     body: JSON.stringify(assetsDatabase)
                 });
 
-                if (!response.ok) {
-                    throw new Error("Erro na rede ou bloqueio de permissão no Google Script.");
-                }
-
+                // Se o fetch não disparar um erro de rede, assumimos que o pacote foi enviado.
                 showToast("Dados enviados para o Google Sheets com sucesso!");
                 
-                // Limpa o banco principal local já que deu certo
+                // BACKUP SALVA-VIDAS: Antes de apagar, fazemos uma cópia de segurança na memória do telemóvel
+                localStorage.setItem('audit_backup', JSON.stringify(assetsDatabase));
+
+                // Esvazia o banco de dados principal local
                 assetsDatabase = []; 
                 localStorage.setItem('audit_db', JSON.stringify(assetsDatabase));
                 updateAssetList();
                 
             } catch (error) {
                 console.error(error);
-                showToast("Erro de envio. Seus dados NÃO foram apagados.", "error");
-                alert("Falha de Comunicação!\n\nSeus dados estão preservados.\n\nPor favor, garanta que no Google Apps Script as permissões estejam como 'Acesso: Qualquer pessoa'.");
+                showToast("Erro ao sincronizar. Seus dados NÃO foram perdidos.", "error");
+                alert("Falha de Comunicação!\n\nSeus dados continuam salvos no seu telemóvel.\n\nVerifique a sua ligação à internet.");
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;

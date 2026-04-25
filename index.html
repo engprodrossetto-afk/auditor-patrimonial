@@ -470,8 +470,6 @@
 
         // --- TRAVA DE SEGURANÇA E BACKUP (Recuperação de dados) ---
         function recoverBackup() {
-        // --- TRAVA DE SEGURANÇA E BACKUP ---
-        function recoverBackup() {
             const backup = localStorage.getItem('audit_backup');
             if (backup && JSON.parse(backup).length > 0) {
                 assetsDatabase = JSON.parse(backup);
@@ -492,17 +490,12 @@
             btn.disabled = true;
 
             try {
-                // CORREÇÃO: Usamos mode 'no-cors' para o navegador não bloquear a resposta opaca do Google
+                // ENVIO OTIMIZADO (Simple POST Request sem no-cors para evitar bloqueios cegos)
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors', 
-                    headers: {
-                        "Content-Type": "text/plain;charset=utf-8"
-                    },
                     body: JSON.stringify(assetsDatabase)
                 });
 
-                // Se o fetch não disparar um erro de rede, assumimos que o pacote foi enviado.
                 showToast("Dados enviados para o Google Sheets com sucesso!");
                 
                 // BACKUP SALVA-VIDAS: Antes de apagar, fazemos uma cópia de segurança na memória do telemóvel
@@ -515,8 +508,9 @@
                 
             } catch (error) {
                 console.error(error);
-                showToast("Erro ao sincronizar. Seus dados NÃO foram perdidos.", "error");
-                alert("Falha de Comunicação!\n\nSeus dados continuam salvos no seu telemóvel.\n\nVerifique a sua ligação à internet.");
+                showToast("Erro ao sincronizar.", "error");
+                // MENSAGEM NOVA PARA COMPROVAR ATUALIZAÇÃO
+                alert("AVISO DE SISTEMA (Versão Atualizada):\n\nFalha de Comunicação!\nOs seus dados continuam guardados em segurança no telemóvel.\n\nVerifique a sua ligação à internet ou as permissões do Google Apps Script.");
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;

@@ -490,9 +490,14 @@
             btn.disabled = true;
 
             try {
-                // ENVIO OTIMIZADO (Simple POST Request sem no-cors para evitar bloqueios cegos)
+                // ENVIO CORRIGIDO: Restaurando o modo 'no-cors' para evitar o bloqueio de segurança do navegador (CORS).
+                // Como as permissões do Google estão agora corretas, a comunicação fluirá.
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
                     body: JSON.stringify(assetsDatabase)
                 });
 
